@@ -43,15 +43,18 @@ def clean_url(value: Any) -> str:
 
 
 def _user_schema() -> vol.Schema:
+    # Keep this schema serializable: Home Assistant sends it to the frontend
+    # through probatio, which cannot render bare callables. URL normalization
+    # therefore happens in async_step_user instead of a vol.All validator.
     return vol.Schema(
         {
             vol.Required(
                 CONF_URL, description={"suggest": "http://127.0.0.1:1010"}
-            ): vol.All(str, clean_url),
+            ): str,
             vol.Optional(CONF_TOKEN, default=""): str,
-            vol.Optional(
-                CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
-            ): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL)),
+            # Plain int keeps the schema serializable for the frontend; the
+            # step clamps it to MIN_SCAN_INTERVAL.
+            vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
         }
     )
 
@@ -69,7 +72,7 @@ def _options_schema(current: dict[str, Any]) -> vol.Schema:
             vol.Optional(
                 CONF_SCAN_INTERVAL,
                 default=current.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-            ): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL)),
+            ): int,
         }
     )
 
@@ -107,23 +110,29 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """First-time setup: URL, optional token, scan interval."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            url = clean_url(user_input[CONF_URL])
-            token = user_input.get(CONF_TOKEN, "").strip()
             try:
-                await _async_validate(self.hass, url, token)
-            except MonitorError as err:
-                errors["base"] = err.reason
+                url = clean_url(user_input[CONF_URL])
+            except vol.Invalid:
+                errors["base"] = "invalid_url"
             else:
-                await self.async_set_unique_id(url)
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title=url,
-                    data={
-                        CONF_URL: url,
-                        CONF_TOKEN: token,
-                        CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
-                    },
-                )
+                token = user_input.get(CONF_TOKEN, "").strip()
+                try:
+                    await _async_validate(self.hass, url, token)
+                except MonitorError as err:
+                    errors["base"] = err.reason
+                else:
+                    await self.async_set_unique_id(url)
+                    self._abort_if_unique_id_configured()
+                    return self.async_create_entry(
+                        title=url,
+                        data={
+                            CONF_URL: url,
+                            CONF_TOKEN: token,
+                            CONF_SCAN_INTERVAL: max(
+                                MIN_SCAN_INTERVAL, user_input[CONF_SCAN_INTERVAL]
+                            ),
+                        },
+                    )
         return self.async_show_form(
             step_id="user", data_schema=_user_schema(), errors=errors
         )
@@ -188,7 +197,9 @@ class MonitorOptionsFlow(config_entries.OptionsFlowWithReload):
                     title="",
                     data={
                         CONF_TOKEN: token,
-                        CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL],
+                        CONF_SCAN_INTERVAL: max(
+                            MIN_SCAN_INTERVAL, user_input[CONF_SCAN_INTERVAL]
+                        ),
                     },
                 )
         return self.async_show_form(
