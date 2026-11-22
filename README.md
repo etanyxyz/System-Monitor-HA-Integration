@@ -13,20 +13,18 @@ The companion Lovelace card lives in
 
 ## What you need
 
-A running System Monitor (the API + dashboard container):
+A running System Monitor (the API + dashboard container). It is built from
+source — there is no published image:
 
 ```bash
-docker run -d --name resource-monitor -p 1010:1010 \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  --group-add "$(getent group docker | cut -d: -f3)" \
-  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
-  etanyxyz/system-monitor:latest
+git clone https://github.com/etanyxyz/System-Monitor.git
+cd System-Monitor
+docker compose up -d --build     # hardened container, port 1010
 ```
 
-or `docker compose up -d --build` from the
-[System-Monitor repo](https://github.com/etanyxyz/System-Monitor).
 It should answer `http://<host>:1010/api/system`. Home Assistant needs to be
-able to reach that address.
+able to reach that address — with Home Assistant on the same Docker host
+(`network_mode: host`), `http://127.0.0.1:1010` also works.
 
 ## Installation
 
