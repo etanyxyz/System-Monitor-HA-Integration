@@ -19,6 +19,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -287,9 +288,11 @@ class ContainerSensor(CoordinatorEntity[ResourceMonitorCoordinator], SensorEntit
         coordinator: ResourceMonitorCoordinator,
         container: dict,
         spec: dict,
+        parent_device_id: str | None = None,
     ) -> None:
         super().__init__(coordinator)
         entry = coordinator.config_entry
+        self._parent_device_id = parent_device_id
         self._cid = container.get("id")
         self._cname = container.get("name") or "container"
         self._field = spec["field"]
@@ -334,15 +337,17 @@ class ContainerSensor(CoordinatorEntity[ResourceMonitorCoordinator], SensorEntit
     def device_info(self):
         entry = self.coordinator.config_entry
         container = self._container() or {}
-        return {
+        info = {
             "identifiers": {
                 (DOMAIN, f"{entry.unique_id}:container:{self._cid}")
             },
             "name": f"Container {self._cname}",
             "manufacturer": "Docker",
             "model": container.get("image"),
-            "via_device": (DOMAIN, entry.unique_id),
         }
+        if self._parent_device_id:
+            info["via_device_id"] = self._parent_device_id
+        return info
 
 
 CONTAINER_SENSOR_DEFS: tuple[dict, ...] = (
@@ -395,6 +400,20 @@ async def async_setup_entry(
     """Set up system and container sensors."""
     coordinator: ResourceMonitorCoordinator = hass.data[DOMAIN][entry.entry_id]
 
+    # Create the monitor device first: container devices link to it through
+    # via_device_id, which needs the parent's device id up front.
+    host_info = _host_device_info(coordinator)
+    registry = dr.async_get(hass)
+    host_device = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers=host_info["identifiers"],
+        name=host_info["name"],
+        manufacturer=host_info["manufacturer"],
+        model=host_info["model"],
+        configuration_url=host_info["configuration_url"],
+    )
+    host_device_id = host_device.id
+
     # Static system sensors
     system_entities = [SystemSensor(coordinator, spec) for spec in SYSTEM_SENSOR_DEFS]
 
@@ -436,7 +455,7 @@ async def async_setup_entry(
         for cid, container in current.items():
             if cid not in container_sensors:
                 sensors = [
-                    ContainerSensor(coordinator, container, spec)
+                    ContainerSensor(coordinator, container, spec, host_device_id)
                     for spec in CONTAINER_SENSOR_DEFS
                 ]
                 container_sensors[cid] = sensors
