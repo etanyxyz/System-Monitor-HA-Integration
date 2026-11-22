@@ -1,0 +1,51 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "System Monitor",
+        "description": "Point this at the Resource Monitor API (the service that serves /api/system and /api/containers).",
+        "data": {
+          "url": "Monitor URL",
+          "token": "Token (MONITOR_TOKEN; leave empty if not set)",
+          "scan_interval": "Poll interval (seconds)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate System Monitor",
+        "description": "The monitor at {url} rejected the stored token. Enter the current MONITOR_TOKEN.",
+        "data": {
+          "token": "Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the monitor.",
+      "invalid_auth": "The monitor rejected the token.",
+      "unknown": "Unexpected error while contacting the monitor."
+    },
+    "abort": {
+      "already_configured": "This monitor is already configured.",
+      "reauth_successful": "Re-authentication successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "System Monitor options",
+        "description": "Settings for the monitor at {url}. The URL itself is fixed; remove and re-add the integration to point it at a different monitor.",
+        "data": {
+          "token": "Token (MONITOR_TOKEN; leave empty if not set)",
+          "scan_interval": "Poll interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the monitor.",
+      "invalid_auth": "The monitor rejected the token.",
+      "unknown": "Unexpected error while contacting the monitor."
+    },
+    "abort": {
+      "already_configured": "This monitor is already configured."
+    }
+  }
+}

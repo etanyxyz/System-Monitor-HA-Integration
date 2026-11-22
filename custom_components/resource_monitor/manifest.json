@@ -1,0 +1,11 @@
+{
+  "domain": "resource_monitor",
+  "name": "System Monitor",
+  "version": "0.1.0",
+  "config_flow": true,
+  "integration_type": "hub",
+  "codeowners": ["etanyxyz"],
+  "documentation": "https://github.com/etanyxyz/System-Monitor-HA-Integration",
+  "issue_tracker": "https://github.com/etanyxyz/System-Monitor-HA-Integration/issues",
+  "iot_class": "local_polling"
+}
